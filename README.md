@@ -43,7 +43,7 @@ Welcome to the **v-music App Deployment** project! This project demonstrates how
 ## 📂 **Code Repository**
 
 Check out the source code and contribute:  
-[![GitHub Repo](https://github.com/vijaysai1718/music)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/vijaysai1718/music)
 
 ---
 
