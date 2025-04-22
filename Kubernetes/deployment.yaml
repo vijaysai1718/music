@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: youtube
+spec:
+ replicas: 2
+ selector:
+    matchLabels:
+     name: "youtube"
+ template:
+  metadata:
+    labels:
+      name: "youtube"
+  spec:
+    containers:
+     - name: youtubeimage
+       image: vijaysai1718/youtube:latest
+       ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: serviceforyoutube
+spec:
+ selector:
+  name: "youtube"
+ type: LoadBalancer
+ ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+

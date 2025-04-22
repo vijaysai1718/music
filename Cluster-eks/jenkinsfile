@@ -1,0 +1,35 @@
+pipeline{
+    agent any
+    stages(){
+        stage('git checkout'){
+            steps{
+                git branch: 'main' , url: 'https://github.com/vijaysai1718/music.git'
+            }
+        }
+        stage('Init'){
+            steps{
+            dir('Cluster-eks') {
+                sh "terraform init"
+                
+            }
+            }
+        }
+           stage('Plan'){
+               when {
+                   expression { params.action == 'apply' }
+               }
+              steps {
+           dir('Cluster-eks')  {
+                  sh "terraform plan"
+            }
+               }
+        }
+           stage('Apply / Destroy'){
+              steps {
+            dir('Cluster-eks') {
+                sh "terraform ${action} --auto-approve"
+            }
+               }
+        }
+    }
+}
