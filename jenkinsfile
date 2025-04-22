@@ -1,0 +1,117 @@
+def color_map= [
+    'SUCCESS' : 'good',
+    'FAILURE' : 'danger',
+    'ABORTED' : 'danger'
+    ]
+
+pipeline{
+    agent any 
+    tools {
+        jdk 'java17'
+        nodejs 'node23'
+    }
+    environment{
+        SCANNER_HOME= tool 'sonarscanner'
+        EKS_CLUSTER_NAME= 'spotify'
+        AWS_DEFAULT_REGION= 'us-east-1'
+    }
+    stages(){
+     stage('notify') {
+            steps {
+                script {
+                     slackSend(
+                channel: '#deployment-prod',
+                message: "${env.JOB_NAME} - ** JOB Started** check url for more info at ${env.BUILD_URL}"
+                )
+                }
+              
+            }
+        }
+        stage('clean workspace'){
+            steps{
+                cleanWs()
+            }
+        }
+        stage('git Checkout') {
+            steps{
+                git branch: 'main' , url: 'https://github.com/vijaysai1718/music.git'
+            }
+        }
+        stage('sonar scanner'){
+            steps{
+                withSonarQubeEnv('sonarserver'){
+                 sh '''   $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=vijayspotify \
+                 -Dsonar.projectKey=vijayspotify \
+                 '''
+                }
+            }
+        }
+        stage('Quailty Gate'){
+            steps{
+                script{
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarkey'
+                }
+            }
+        }
+          stage("Install NPM Dependencies") {
+            steps {
+                sh "npm install"
+            }
+        }
+		stage('trivy Scan'){
+		steps{
+		sh "trivy fs . >trivy.txt"
+		}
+		}
+        stage('Build Image'){
+            steps{
+                script{
+                    withDockerRegistry(credentialsId: 'docker') {
+             sh '''
+             docker build -t vijayspotify .
+             docker tag vijayspotify vijaysai1718/vijayspotify:latest
+             docker push vijaysai1718/vijayspotify:latest
+                '''}
+                   
+                }
+                
+            }
+        }
+	 stage('Image Scan'){
+		steps{
+		sh "trivy image vijaysai1718/vijayspotify >trivy.txt"
+		}
+		}
+        stage(' Docker Run Container'){
+            steps{
+                sh '''
+                docker stop vijayspotify || true
+                docker rm vijayspotify || true 
+                docker run -d --name vijayspotify -p 3000:3000 vijaysai1718/vijayspotify:latest
+                
+                '''
+            }
+        }
+        stage('Kubernetes'){
+            steps{
+                script{
+withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
+                sh '''
+                kubectl apply -f Kubernetes/deployment.yaml
+                '''
+                }
+            }
+        }
+        }
+}
+post{
+           always{
+                slackSend(
+                    channel: '#deployment-prod' ,
+                    color: color_map[currentBuild.currentResult],
+                    message: "${env.JOB_NAME} - Build Number- #${env.BUILD_NUMBER}  got ${currentBuild.currentResult} for more details check out  at ${env.BUILD_URL}" , 
+                    tokenCredentialId: 'slack' 
+                    )
+            }
+        }
+}
